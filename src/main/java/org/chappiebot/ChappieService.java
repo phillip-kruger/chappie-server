@@ -9,14 +9,14 @@ import io.quarkus.runtime.Startup;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
-import org.chappiebot.doc.DocAssistant;
 import org.chappiebot.exception.ExceptionAssistant;
 import org.chappiebot.explain.ExplainAssistant;
-import org.chappiebot.test.TestAssistant;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
 import java.util.Optional;
+import org.chappiebot.source.generation.SourceGenerationAssistant;
+import org.chappiebot.source.manipulation.SourceManipulationAssistant;
 
 /**
  * The Chappie Server
@@ -111,10 +111,15 @@ public class ChappieService {
     }
 
     @Produces
-    public DocAssistant getDocAssistant() {
-        return AiServices.create(DocAssistant.class, chatLanguageModel);
+    public SourceManipulationAssistant getSourceManipulationAssistant() {
+        return AiServices.create(SourceManipulationAssistant.class, chatLanguageModel);
     }
 
+    @Produces
+    public SourceGenerationAssistant getSourceGenerationAssistant() {
+        return AiServices.create(SourceGenerationAssistant.class, chatLanguageModel);
+    }
+    
     @Produces
     public ExceptionAssistant getExceptionAssistant() {
         return AiServices.create(ExceptionAssistant.class, chatLanguageModel);
@@ -123,10 +128,5 @@ public class ChappieService {
     @Produces
     public ExplainAssistant getExplainAssistant() {
         return AiServices.create(ExplainAssistant.class, chatLanguageModel);
-    }
-
-    @Produces
-    public TestAssistant getTestAssistant() {
-        return AiServices.create(TestAssistant.class, chatLanguageModel);
-    }
+    }    
 }
