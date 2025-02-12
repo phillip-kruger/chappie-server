@@ -1,4 +1,4 @@
-package org.chappiebot.source.generation;
+package org.chappiebot.content.generation;
 
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
@@ -7,22 +7,23 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 
 /**
- * The Endpoint for source generation
+ * The Endpoint for content generation
  * @author Phillip Kruger (phillip.kruger@gmail.com)
  */
-@Path("/api/generateSource")
-public class SourceGenerationEndpoint {
+@Path("/api/generate")
+public class GenerationEndpoint {
     
     @Inject
-    SourceGenerationAssistant sourceGenerationAssistant;
+    GenerationAssistant generationAssistant;
     
     @POST
-    public Uni<SourceGenerationOutput> generateSource(SourceGenerationInput input) {
-        return Uni.createFrom().item(() -> sourceGenerationAssistant.generateSource(input.genericInput().programmingLanguage(),
+    public Uni<GenerationOutput> generate(GenerationInput input) {
+        return Uni.createFrom().item(() -> generationAssistant.generate(input.genericInput().programmingLanguage(),
                 input.genericInput().programmingLanguageVersion(), 
                 input.genericInput().product(), 
                 input.genericInput().productVersion(), 
-                input.source(), 
+                input.path(), 
+                input.content(), 
                 input.genericInput().systemmessage(), 
                 input.genericInput().usermessage()))
             .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());

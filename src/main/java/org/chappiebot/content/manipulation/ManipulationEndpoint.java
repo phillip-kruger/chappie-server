@@ -1,4 +1,4 @@
-package org.chappiebot.source.manipulation;
+package org.chappiebot.content.manipulation;
 
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
@@ -7,22 +7,23 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 
 /**
- * The Endpoint for source manipulation
+ * The Endpoint for content manipulation
  * @author Phillip Kruger (phillip.kruger@gmail.com)
  */
-@Path("/api/manipulateSource")
-public class SourceManipulationEndpoint {
+@Path("/api/manipulate")
+public class ManipulationEndpoint {
     
     @Inject
-    SourceManipulationAssistant sourceManipulationAssistant;
+    ManipulationAssistant manipulationAssistant;
     
     @POST
-    public Uni<SourceManipulationOutput> manipulateSource(SourceManipulationInput input) {
-        return Uni.createFrom().item(() -> sourceManipulationAssistant.manipulateSource(input.genericInput().programmingLanguage(),
+    public Uni<ManipulationOutput> manipulate(ManipulationInput input) {
+        return Uni.createFrom().item(() -> manipulationAssistant.manipulate(input.genericInput().programmingLanguage(),
                 input.genericInput().programmingLanguageVersion(), 
                 input.genericInput().product(), 
                 input.genericInput().productVersion(), 
-                input.source(), 
+                input.path(), 
+                input.content(), 
                 input.genericInput().systemmessage(), 
                 input.genericInput().usermessage()))
             .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());

@@ -15,8 +15,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
 import java.util.Optional;
-import org.chappiebot.source.generation.SourceGenerationAssistant;
-import org.chappiebot.source.manipulation.SourceManipulationAssistant;
+import org.chappiebot.content.generation.GenerationAssistant;
+import org.chappiebot.content.manipulation.ManipulationAssistant;
 
 /**
  * The Chappie Server
@@ -111,13 +111,13 @@ public class ChappieService {
     }
 
     @Produces
-    public SourceManipulationAssistant getSourceManipulationAssistant() {
-        return AiServices.create(SourceManipulationAssistant.class, chatLanguageModel);
+    public ManipulationAssistant getSourceManipulationAssistant() {
+        return AiServices.create(ManipulationAssistant.class, chatLanguageModel);
     }
 
     @Produces
-    public SourceGenerationAssistant getSourceGenerationAssistant() {
-        return AiServices.create(SourceGenerationAssistant.class, chatLanguageModel);
+    public GenerationAssistant getSourceGenerationAssistant() {
+        return AiServices.create(GenerationAssistant.class, chatLanguageModel);
     }
     
     @Produces
