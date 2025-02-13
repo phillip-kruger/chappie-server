@@ -1,10 +1,9 @@
 package org.chappiebot.exception;
 
-import org.chappiebot.CommonInput;
-import java.util.Optional;
+import org.chappiebot.GenericInput;
 
-public record ExceptionInput(CommonInput commonInput,
-                        Optional<String> extraContext,
+public record ExceptionInput(GenericInput genericInput,
                         String stacktrace,
-                        String source){
+                        String path,
+                        String content){
 }

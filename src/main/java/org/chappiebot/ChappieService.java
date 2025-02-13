@@ -10,12 +10,12 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 import org.chappiebot.exception.ExceptionAssistant;
-import org.chappiebot.explain.ExplainAssistant;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
 import java.util.Optional;
 import org.chappiebot.content.generation.GenerationAssistant;
+import org.chappiebot.content.interpretation.InterpretationAssistant;
 import org.chappiebot.content.manipulation.ManipulationAssistant;
 
 /**
@@ -29,7 +29,7 @@ public class ChappieService {
 
     private ChatLanguageModel chatLanguageModel;
 
-    @ConfigProperty(name = "chappie.log.request", defaultValue = "false")
+    @ConfigProperty(name = "chappie.log.request", defaultValue = "true")
     boolean logRequest;
 
     @ConfigProperty(name = "chappie.log.response", defaultValue = "false")
@@ -111,22 +111,22 @@ public class ChappieService {
     }
 
     @Produces
-    public ManipulationAssistant getSourceManipulationAssistant() {
+    public ManipulationAssistant getManipulationAssistant() {
         return AiServices.create(ManipulationAssistant.class, chatLanguageModel);
     }
 
     @Produces
-    public GenerationAssistant getSourceGenerationAssistant() {
+    public GenerationAssistant getGenerationAssistant() {
         return AiServices.create(GenerationAssistant.class, chatLanguageModel);
+    }
+    
+    @Produces
+    public InterpretationAssistant getInterpretationAssistant() {
+        return AiServices.create(InterpretationAssistant.class, chatLanguageModel);
     }
     
     @Produces
     public ExceptionAssistant getExceptionAssistant() {
         return AiServices.create(ExceptionAssistant.class, chatLanguageModel);
     }
-
-    @Produces
-    public ExplainAssistant getExplainAssistant() {
-        return AiServices.create(ExplainAssistant.class, chatLanguageModel);
-    }    
 }

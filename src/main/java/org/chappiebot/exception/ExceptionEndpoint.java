@@ -16,16 +16,18 @@ public class ExceptionEndpoint {
     @Inject ExceptionAssistant exceptionAssistant;
 
     @POST
-    public Uni<ExceptionOutput> suggestfix(ExceptionInput exceptionInput) {
+    public Uni<ExceptionOutput> exception(ExceptionInput exceptionInput) {
         
-        return Uni.createFrom().item(() -> exceptionAssistant.suggestFix(
-                    exceptionInput.commonInput().programmingLanguage(), 
-                    exceptionInput.commonInput().programmingLanguageVersion(), 
-                    exceptionInput.commonInput().product(), 
-                    exceptionInput.commonInput().productVersion(), 
-                    exceptionInput.extraContext().orElse(""), 
+        return Uni.createFrom().item(() -> exceptionAssistant.exception(
+                    exceptionInput.genericInput().programmingLanguage(), 
+                    exceptionInput.genericInput().programmingLanguageVersion(), 
+                    exceptionInput.genericInput().product(), 
+                    exceptionInput.genericInput().productVersion(), 
                     exceptionInput.stacktrace(), 
-                    exceptionInput.source()))
+                    exceptionInput.path(), 
+                    exceptionInput.content(),
+                    exceptionInput.genericInput().systemmessage(),
+                    exceptionInput.genericInput().usermessage()))
                 .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }
