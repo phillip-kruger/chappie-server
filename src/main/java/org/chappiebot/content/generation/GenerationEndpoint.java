@@ -17,16 +17,15 @@ public class GenerationEndpoint {
     GenerationAssistant generationAssistant;
     
     @POST
-    public Uni<GenerationOutput> generate(GenerationInput input) {
-        return Uni.createFrom().item(() -> generationAssistant.generate(input.genericInput().programmingLanguage(),
+    public GenerationOutput generate(GenerationInput input) {
+        return generationAssistant.generate(input.genericInput().programmingLanguage(),
                 input.genericInput().programmingLanguageVersion(), 
                 input.genericInput().product(), 
                 input.genericInput().productVersion(), 
                 input.path(), 
                 input.content(), 
                 input.genericInput().systemmessage(), 
-                input.genericInput().usermessage()))
-            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+                input.genericInput().usermessage());
     }
     
 }

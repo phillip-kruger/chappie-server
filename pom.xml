@@ -94,7 +94,11 @@
             <artifactId>langchain4j-ollama</artifactId>
             <version>${langchain4j.version}</version>
         </dependency>
-        
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.8</version>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>

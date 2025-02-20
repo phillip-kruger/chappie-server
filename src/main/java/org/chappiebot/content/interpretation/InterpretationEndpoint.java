@@ -1,7 +1,5 @@
 package org.chappiebot.content.interpretation;
 
-import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -17,16 +15,15 @@ public class InterpretationEndpoint {
     InterpretationAssistant interpretationAssistant;
     
     @POST
-    public Uni<InterpretationOutput> interpret(InterpretationInput input) {
-        return Uni.createFrom().item(() -> interpretationAssistant.interpret(input.genericInput().programmingLanguage(),
+    public InterpretationOutput interpret(InterpretationInput input) {
+        return interpretationAssistant.interpret(input.genericInput().programmingLanguage(),
                 input.genericInput().programmingLanguageVersion(), 
                 input.genericInput().product(), 
                 input.genericInput().productVersion(), 
                 input.path(), 
                 input.content(), 
                 input.genericInput().systemmessage(), 
-                input.genericInput().usermessage()))
-            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+                input.genericInput().usermessage());
     }
     
 }

@@ -1,7 +1,5 @@
 package org.chappiebot.exception;
 
-import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -16,9 +14,9 @@ public class ExceptionEndpoint {
     @Inject ExceptionAssistant exceptionAssistant;
 
     @POST
-    public Uni<ExceptionOutput> exception(ExceptionInput exceptionInput) {
+    public ExceptionOutput exception(ExceptionInput exceptionInput) {
         
-        return Uni.createFrom().item(() -> exceptionAssistant.exception(
+        return exceptionAssistant.exception(
                     exceptionInput.genericInput().programmingLanguage(), 
                     exceptionInput.genericInput().programmingLanguageVersion(), 
                     exceptionInput.genericInput().product(), 
@@ -27,7 +25,6 @@ public class ExceptionEndpoint {
                     exceptionInput.path(), 
                     exceptionInput.content(),
                     exceptionInput.genericInput().systemmessage(),
-                    exceptionInput.genericInput().usermessage()))
-                .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+                    exceptionInput.genericInput().usermessage());
     }
 }

@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.chappiebot.content.generation.GenerationAssistant;
 import org.chappiebot.content.interpretation.InterpretationAssistant;
 import org.chappiebot.content.manipulation.ManipulationAssistant;
+import org.chappiebot.dynamic.DynamicAssistant;
 
 /**
  * The Chappie Server
@@ -128,5 +129,10 @@ public class ChappieService {
     @Produces
     public ExceptionAssistant getExceptionAssistant() {
         return AiServices.create(ExceptionAssistant.class, chatLanguageModel);
+    }
+    
+    @Produces
+    public DynamicAssistant getDynamicAssistant() {
+        return AiServices.create(DynamicAssistant.class, chatLanguageModel);
     }
 }
