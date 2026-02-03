@@ -36,6 +36,9 @@ import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.store.embedding.filter.comparison.ContainsString;
+import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
+import dev.langchain4j.store.embedding.filter.logical.And;
+import dev.langchain4j.store.embedding.filter.logical.Or;
 import jakarta.annotation.PreDestroy;
 
 import java.util.List;
@@ -329,15 +332,71 @@ public class ChappieService {
 
         this.retrievalAugmentor = retrievalProvider.getRetrievalAugmentor((t) -> {
             Map<String, String> variables = ragRequestContext.getVariables();
-            if (variables != null && !variables.isEmpty() && variables.containsKey("extension")) {
-                String extension = variables.get("extension");
-                if (extension != null && !extension.equalsIgnoreCase("any")) {
-                    Log.info("Narrowing to [" + extension + "]");
-                    return new ContainsString("extensions_csv_padded", "," + extension + ",");
+            if (variables == null || variables.isEmpty()) {
+                return null;
+            }
+
+            // Build combined filter for libraries and extensions
+            dev.langchain4j.store.embedding.filter.Filter libraryFilter = null;
+            dev.langchain4j.store.embedding.filter.Filter extensionFilter = null;
+
+            // Check for library filtering
+            if (variables.containsKey("libraries")) {
+                String libraries = variables.get("libraries");
+                if (libraries != null && !libraries.trim().isEmpty() && !libraries.equalsIgnoreCase("any")) {
+                    Log.infof("Narrowing to libraries: [%s]", libraries);
+                    libraryFilter = buildLibraryFilter(libraries);
                 }
             }
+
+            // Check for extension filtering
+            if (variables.containsKey("extension")) {
+                String extension = variables.get("extension");
+                if (extension != null && !extension.equalsIgnoreCase("any")) {
+                    Log.infof("Narrowing to extension: [%s]", extension);
+                    extensionFilter = new ContainsString("extensions_csv_padded", "," + extension + ",");
+                }
+            }
+
+            // Combine filters with AND logic
+            if (libraryFilter != null && extensionFilter != null) {
+                return new And(libraryFilter, extensionFilter);
+            } else if (libraryFilter != null) {
+                return libraryFilter;
+            } else if (extensionFilter != null) {
+                return extensionFilter;
+            }
+
             return null;
         });
+    }
+
+    /**
+     * Builds a library filter from comma-separated library names.
+     * Supports single library or multiple libraries with OR logic.
+     */
+    private dev.langchain4j.store.embedding.filter.Filter buildLibraryFilter(String libraries) {
+        String[] libs = libraries.split(",");
+        if (libs.length == 0) {
+            return null;
+        }
+
+        // Trim whitespace
+        for (int i = 0; i < libs.length; i++) {
+            libs[i] = libs[i].trim();
+        }
+
+        // Single library - simple equality check
+        if (libs.length == 1) {
+            return new IsEqualTo("library", libs[0]);
+        }
+
+        // Multiple libraries - chain OR conditions
+        dev.langchain4j.store.embedding.filter.Filter result = new IsEqualTo("library", libs[0]);
+        for (int i = 1; i < libs.length; i++) {
+            result = new Or(result, new IsEqualTo("library", libs[i]));
+        }
+        return result;
     }
 
     private void enableMcpIfConfigured() {

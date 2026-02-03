@@ -18,6 +18,9 @@ import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.comparison.ContainsString;
+import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
+import dev.langchain4j.store.embedding.filter.logical.And;
+import dev.langchain4j.store.embedding.filter.logical.Or;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.ContentMetadata;
 import io.quarkus.logging.Log;
@@ -51,7 +54,10 @@ public class RetrievalProvider {
 
     @ConfigProperty(name = "chappie.rag.score.min", defaultValue = "0.82")
     double ragMinScore;
-    
+
+    @ConfigProperty(name = "chappie.rag.libraries", defaultValue = "quarkus")
+    String activeLibraries;
+
     @PostConstruct
     public void init() {
         if (ragEnabled) {
@@ -68,6 +74,10 @@ public class RetrievalProvider {
         return ragMaxResults;
     }
 
+    public String getActiveLibraries() {
+        return activeLibraries;
+    }
+
     private void loadVectorStore() {
         this.embeddingStore = storeManager.getStore().orElse(null);
     }
@@ -81,11 +91,91 @@ public class RetrievalProvider {
         return new ContainsString("extensions_csv_padded", extension);
     }
 
+    /**
+     * Creates a filter for library-based filtering.
+     * Supports filtering by single library or comma-separated list.
+     *
+     * @param libraries Comma-separated list of libraries (e.g., "quarkus,hibernate-orm")
+     * @return Filter that matches documents from any of the specified libraries
+     */
+    private Filter libraryFilter(String libraries) {
+        if (libraries == null || libraries.trim().isEmpty()) {
+            return null;
+        }
+
+        String[] libs = libraries.split(",");
+        if (libs.length == 0) {
+            return null;
+        }
+
+        // Trim whitespace
+        for (int i = 0; i < libs.length; i++) {
+            libs[i] = libs[i].trim();
+        }
+
+        // Single library - simple equality check
+        if (libs.length == 1) {
+            return new IsEqualTo("library", libs[0]);
+        }
+
+        // Multiple libraries - chain OR conditions
+        // Or takes exactly 2 arguments, so we chain them: (a OR b) OR c OR d...
+        Filter result = new IsEqualTo("library", libs[0]);
+        for (int i = 1; i < libs.length; i++) {
+            result = new Or(result, new IsEqualTo("library", libs[i]));
+        }
+        return result;
+    }
+
+    /**
+     * Combines multiple filters using AND logic.
+     *
+     * @param filters Filters to combine (nulls are ignored)
+     * @return Combined filter, or null if no valid filters
+     */
+    private Filter combineFilters(Filter... filters) {
+        List<Filter> validFilters = new java.util.ArrayList<>();
+        for (Filter filter : filters) {
+            if (filter != null) {
+                validFilters.add(filter);
+            }
+        }
+
+        if (validFilters.isEmpty()) {
+            return null;
+        }
+        if (validFilters.size() == 1) {
+            return validFilters.get(0);
+        }
+
+        // Chain AND conditions: (a AND b) AND c AND d...
+        Filter result = validFilters.get(0);
+        for (int i = 1; i < validFilters.size(); i++) {
+            result = new And(result, validFilters.get(i));
+        }
+        return result;
+    }
+
     public List<SearchMatch> search(String queryMessage, int maxResults, String restrictToExtension) {
-        return search(queryMessage, maxResults, restrictToExtension, true);
+        return search(queryMessage, maxResults, restrictToExtension, null, true);
     }
 
     public List<SearchMatch> search(String queryMessage, int maxResults, String restrictToExtension, boolean useMetadataBoost) {
+        return search(queryMessage, maxResults, restrictToExtension, null, useMetadataBoost);
+    }
+
+    /**
+     * Search with library and extension filtering.
+     *
+     * @param queryMessage The search query
+     * @param maxResults Maximum number of results to return
+     * @param restrictToExtension Optional extension filter (e.g., "quarkus-hibernate-orm")
+     * @param restrictToLibraries Optional library filter (e.g., "quarkus,hibernate-orm"). If null, uses configured default.
+     * @param useMetadataBoost Whether to apply metadata-based score boosting
+     * @return List of search matches
+     */
+    public List<SearchMatch> search(String queryMessage, int maxResults, String restrictToExtension,
+                                     String restrictToLibraries, boolean useMetadataBoost) {
         Embedding embeddedQuery = embeddingModel.embed(queryMessage).content();
 
         // Fetch more results if using metadata boost, so we can rerank
@@ -95,10 +185,28 @@ public class RetrievalProvider {
                 .queryEmbedding(embeddedQuery)
                 .maxResults(fetchCount)
                 .minScore(0.0);
+
+        // Build combined filter (library AND extension if both specified)
+        Filter extensionFilt = null;
+        Filter libraryFilt = null;
+
         if (restrictToExtension != null) {
             Log.info("Restricting search to extension: " + restrictToExtension);
-            requestBuilder.filter(extensionFilter(restrictToExtension));
+            extensionFilt = extensionFilter(restrictToExtension);
         }
+
+        // Use provided libraries or fall back to configured default
+        String librariesToUse = (restrictToLibraries != null) ? restrictToLibraries : activeLibraries;
+        if (librariesToUse != null && !librariesToUse.trim().isEmpty()) {
+            Log.infof("Restricting search to libraries: %s", librariesToUse);
+            libraryFilt = libraryFilter(librariesToUse);
+        }
+
+        Filter combinedFilter = combineFilters(libraryFilt, extensionFilt);
+        if (combinedFilter != null) {
+            requestBuilder.filter(combinedFilter);
+        }
+
         EmbeddingSearchRequest searchRequest = requestBuilder.build();
 
         EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);

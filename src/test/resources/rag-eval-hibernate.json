@@ -1,0 +1,202 @@
+[
+  {
+    "id": "hibernate-entity-mapping",
+    "query": "How do I map a JPA entity in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-relationships",
+    "query": "How do I define one-to-many relationships in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.83 }
+    }
+  },
+  {
+    "id": "hibernate-lazy-eager",
+    "query": "What is the difference between EAGER and LAZY fetching in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-second-level-cache",
+    "query": "How do I configure Hibernate second-level cache?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.83 }
+    }
+  },
+  {
+    "id": "hibernate-connection-pool",
+    "query": "How do I configure Hibernate connection pooling?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-query-criteria",
+    "query": "How do I use Criteria API in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-hql",
+    "query": "How do I write HQL queries in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.83 }
+    }
+  },
+  {
+    "id": "hibernate-native-sql",
+    "query": "How do I execute native SQL queries in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-transaction-management",
+    "query": "How do I manage transactions in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-cascade-types",
+    "query": "What are the cascade types in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-inheritance-mapping",
+    "query": "How do I map inheritance hierarchies in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-composite-keys",
+    "query": "How do I define composite primary keys in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-embeddable",
+    "query": "How do I use @Embeddable in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-generated-values",
+    "query": "How do I configure auto-generated IDs in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-named-queries",
+    "query": "How do I define named queries in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-batch-processing",
+    "query": "How do I perform batch inserts in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-formula",
+    "query": "How do I use @Formula annotation in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-where-clause",
+    "query": "How do I use @Where annotation in Hibernate for soft deletes?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-filter",
+    "query": "How do I use Hibernate filters?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-envers",
+    "query": "How do I use Hibernate Envers for auditing?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-optimistic-locking",
+    "query": "How do I implement optimistic locking in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-pessimistic-locking",
+    "query": "How do I use pessimistic locking in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-session-flush",
+    "query": "When does Hibernate flush the session?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-fetch-strategies",
+    "query": "What are the different fetch strategies in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  },
+  {
+    "id": "hibernate-converters",
+    "query": "How do I use AttributeConverter in Hibernate?",
+    "assertions": {
+      "anyRepoPathContains": ["hibernate"],
+      "minScoreAtRankLe": { "rank": 10, "score": 0.82 }
+    }
+  }
+]

@@ -18,12 +18,15 @@ public class SearchEndpoint {
 
     @POST
     public SearchResponse search(SearchRequest query) {
-        Log.info("Search request: " + query.queryMessage());
+        Log.infof("Search request: %s (extension=%s, libraries=%s)",
+                  query.queryMessage(), query.extension(), query.libraries());
         String queryMessage = query.queryMessage();
         int maxResults = Objects.requireNonNullElse(query.maxResults(), retrievalProvider.getRagMaxResults());
         String restrictToExtension = query.extension();
+        String restrictToLibraries = query.libraries();
 
-        List<SearchMatch> search = retrievalProvider.search(queryMessage, maxResults, restrictToExtension);
+        List<SearchMatch> search = retrievalProvider.search(queryMessage, maxResults,
+                                                             restrictToExtension, restrictToLibraries, true);
         return new SearchResponse(search);
     }
 
