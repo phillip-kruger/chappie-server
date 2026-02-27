@@ -14,19 +14,44 @@ import java.util.Map;
 import javax.sql.DataSource;
 
 /**
- * Implements ChatMemoryStore to use the already existing DB
+ * Implements ChatMemoryStore to use the already existing DB.
+ * Thread-safe for concurrent access.
+ *
  * @author Phillip Kruger (phillip.kruger@gmail.com)
  */
 public class JdbcChatMemoryStore implements ChatMemoryStore {
-    
+
+    // Valid table name pattern: alphanumeric and underscores only
+    private static final java.util.regex.Pattern VALID_TABLE_NAME =
+        java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
+
     private final DataSource ds;
     private final String table;
     private final String nameTable;
-            
+
     public JdbcChatMemoryStore(DataSource ds, String table, String nameTable) {
-        this.ds = ds;
-        this.table = table;
-        this.nameTable = nameTable;
+        this.ds = java.util.Objects.requireNonNull(ds, "DataSource cannot be null");
+        this.table = validateTableName(table, "table");
+        this.nameTable = validateTableName(nameTable, "nameTable");
+    }
+
+    /**
+     * Validates that a table name is safe to use in SQL statements.
+     * Prevents SQL injection via table name manipulation.
+     */
+    private static String validateTableName(String name, String paramName) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException(paramName + " cannot be null or blank");
+        }
+        String trimmed = name.trim();
+        if (!VALID_TABLE_NAME.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException(
+                paramName + " contains invalid characters. Only alphanumeric and underscores allowed: " + name);
+        }
+        if (trimmed.length() > 63) { // PostgreSQL identifier limit
+            throw new IllegalArgumentException(paramName + " exceeds maximum length of 63 characters");
+        }
+        return trimmed;
     }
     
     public void setNiceName(String memoryId, String niceName) {
@@ -43,7 +68,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
             ps.setString(2, clean);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to set nice name for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("set nice name", memoryId, e);
         }
     }
     
@@ -56,7 +81,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
                 if (rs.next()) return rs.getString(1);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to get nice name for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("get nice name", memoryId, e);
         }
         return null;
     }
@@ -68,7 +93,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
             ps.setString(1, memoryId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete nice name for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("delete nice name", memoryId, e);
         }
     }
 
@@ -119,7 +144,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to list memory summaries", e);
+            throw ChatMemoryStoreException.forListOperation("list memory summaries", e);
         }
         return out;
     }
@@ -138,7 +163,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) ids.add(rs.getString(1));
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to load memory IDs", e);
+            throw ChatMemoryStoreException.forListOperation("load memory IDs", e);
         }
         return ids;
     }
@@ -189,7 +214,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
             return java.util.Collections.singletonMap(summary, messages);
 
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to load most recent chat", e);
+            throw ChatMemoryStoreException.forListOperation("load most recent chat", e);
         }
     }
     
@@ -240,7 +265,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
                 return java.util.Collections.singletonMap(summary, messages);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to load chat for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("load chat", memoryId, e);
         }
     }
     
@@ -258,7 +283,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to load chat memory for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("load chat memory", memoryId, e);
         }
         return out;
     }
@@ -282,7 +307,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
 
             c.commit();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete conversation for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("delete conversation", memoryId, e);
         }
     }
     
@@ -309,7 +334,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
             }
             c.commit();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to update chat memory for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("update chat memory", memoryId, e);
         }
     }
 
@@ -321,7 +346,7 @@ public class JdbcChatMemoryStore implements ChatMemoryStore {
             ps.setString(1, String.valueOf(memoryId));
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete chat memory for " + memoryId, e);
+            throw ChatMemoryStoreException.forMemoryOperation("delete chat memory", memoryId, e);
         }
     }
 }

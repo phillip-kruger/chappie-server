@@ -51,6 +51,15 @@ public class RetrievalProvider {
 
     @ConfigProperty(name = "chappie.rag.score.min", defaultValue = "0.82")
     double ragMinScore;
+
+    @ConfigProperty(name = "chappie.rag.fetch.multiplier", defaultValue = "5")
+    int fetchMultiplier;
+
+    @ConfigProperty(name = "chappie.rag.fetch.min", defaultValue = "50")
+    int fetchMinimum;
+
+    @ConfigProperty(name = "chappie.rag.content.max-length", defaultValue = "1400")
+    int contentMaxLength;
     
     @PostConstruct
     public void init() {
@@ -116,7 +125,7 @@ public class RetrievalProvider {
         Embedding embeddedQuery = embeddingModel.embed(queryMessage).content();
 
         // Fetch more results if using metadata boost, so we can rerank
-        int fetchCount = useMetadataBoost ? Math.max(maxResults * 5, 50) : maxResults;
+        int fetchCount = useMetadataBoost ? Math.max(maxResults * fetchMultiplier, fetchMinimum) : maxResults;
 
         EmbeddingSearchRequest.EmbeddingSearchRequestBuilder requestBuilder = EmbeddingSearchRequest.builder()
                 .queryEmbedding(embeddedQuery)
@@ -187,19 +196,19 @@ public class RetrievalProvider {
             for (String keyword : directKeywords) {
                 if (title.contains(keyword)) {
                     boostedScore += 0.15;  // Significant boost for direct title match
-                    Log.debugf("Metadata boost: title '%s' matches keyword '%s' (+0.15)", title, keyword);
+                    Log.tracef("Metadata boost: title match for keyword '%s' (+0.15)", keyword);
                 }
                 if (repoPath.contains(keyword)) {
                     boostedScore += 0.10;  // Moderate boost for direct repo_path match
-                    Log.debugf("Metadata boost: repo_path '%s' matches keyword '%s' (+0.10)", repoPath, keyword);
+                    Log.tracef("Metadata boost: repo_path match for keyword '%s' (+0.10)", keyword);
                 }
                 if (docKeywords.contains(keyword)) {
                     boostedScore += 0.20;  // Strong boost for keywords match (most specific!)
-                    Log.debugf("Metadata boost: keywords '%s' matches '%s' (+0.20)", docKeywords, keyword);
+                    Log.tracef("Metadata boost: keywords match for '%s' (+0.20)", keyword);
                 }
                 if (docTopics.contains(keyword)) {
                     boostedScore += 0.25;  // STRONGEST boost for topics match (from AsciiDoc metadata!)
-                    Log.debugf("Metadata boost: topics '%s' matches '%s' (+0.25)", docTopics, keyword);
+                    Log.tracef("Metadata boost: topics match for '%s' (+0.25)", keyword);
                 }
             }
 
@@ -207,19 +216,19 @@ public class RetrievalProvider {
             for (String synonym : synonymKeywords) {
                 if (title.contains(synonym)) {
                     boostedScore += 0.12;  // Moderate boost for synonym title match
-                    Log.debugf("Metadata boost: title '%s' matches synonym '%s' (+0.12)", title, synonym);
+                    Log.tracef("Metadata boost: title match for synonym '%s' (+0.12)", synonym);
                 }
                 if (repoPath.contains(synonym)) {
                     boostedScore += 0.08;  // Moderate boost for synonym repo_path match
-                    Log.debugf("Metadata boost: repo_path '%s' matches synonym '%s' (+0.08)", repoPath, synonym);
+                    Log.tracef("Metadata boost: repo_path match for synonym '%s' (+0.08)", synonym);
                 }
                 if (docKeywords.contains(synonym)) {
                     boostedScore += 0.15;  // Good boost for synonym in keywords
-                    Log.debugf("Metadata boost: keywords '%s' matches synonym '%s' (+0.15)", docKeywords, synonym);
+                    Log.tracef("Metadata boost: keywords match for synonym '%s' (+0.15)", synonym);
                 }
                 if (docTopics.contains(synonym)) {
                     boostedScore += 0.20;  // Strong boost for synonym in topics
-                    Log.debugf("Metadata boost: topics '%s' matches synonym '%s' (+0.20)", docTopics, synonym);
+                    Log.tracef("Metadata boost: topics match for synonym '%s' (+0.20)", synonym);
                 }
             }
 
@@ -306,7 +315,7 @@ public class RetrievalProvider {
                             // TODO: Can we surface the Score somehow ?
                             String t = c.textSegment().text();
                             if (t == null) return "";
-                            if (t.length() > 1400) t = t.substring(0, 1400) + " …"; // TODO: Make 1400 a input option
+                            if (t.length() > contentMaxLength) t = t.substring(0, contentMaxLength) + " …";
                             return t;
                         })
                         .filter(s -> !s.isBlank())

@@ -25,7 +25,7 @@ public class StoreManager {
     @ConfigProperty(name = "chappie.rag.pgvector.dimension", defaultValue = "384")
     int dim;
     
-    private Optional<PgVectorEmbeddingStore> cached;
+    private volatile Optional<PgVectorEmbeddingStore> cached;
 
     private JdbcChatMemoryStore jdbcChatMemoryStore = null;
     

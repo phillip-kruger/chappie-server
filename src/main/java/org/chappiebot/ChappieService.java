@@ -198,7 +198,7 @@ public class ChappieService {
                 .temperature(temperature)
                 .responseFormat("json_object");
 
-        if (!mcpServers.isEmpty() && !mcpServers.get().isEmpty()) {
+        if (hasMcpServers()) {
             builder = builder
                     .defaultRequestParameters(chatRequestParameters)
                     .parallelToolCalls(false);
@@ -215,68 +215,68 @@ public class ChappieService {
         Log.info("CHAPPiE is using Gemini " + geminiModelName);
         Log.info("CHAPPiE timeout set to " + timeout);
         Log.info("CHAPPiE temperature set to " + temperature);
-        
+
         GoogleAiGeminiChatModel.GoogleAiGeminiChatModelBuilder builder = GoogleAiGeminiChatModel.builder()
                 .logRequests(logRequest)
                 .logResponses(logResponse)
-                .apiKey(geminiKey.get())
+                .apiKey(geminiKey.orElseThrow(() -> new IllegalStateException("Gemini API key is required")))
                 .modelName(geminiModelName)
                 .timeout(timeout)
                 .temperature(temperature)
                 .responseFormat(ResponseFormat.JSON);
 
-        if (!mcpServers.isEmpty() && !mcpServers.get().isEmpty()) {
+        if (hasMcpServers()) {
             builder = builder
                     .defaultRequestParameters(chatRequestParameters);
         }
 
         this.chatModel = builder.build();
     }
-    
+
     private void loadAnthropicModel() {
         Log.info("CHAPPiE is using Anthropic " + anthropicModelName);
         Log.info("CHAPPiE timeout set to " + timeout);
         Log.info("CHAPPiE temperature set to " + temperature);
-        
+
         AnthropicChatModel.AnthropicChatModelBuilder builder = AnthropicChatModel.builder()
                 .logRequests(logRequest)
                 .logResponses(logResponse)
-                .apiKey(anthropicKey.get())
+                .apiKey(anthropicKey.orElseThrow(() -> new IllegalStateException("Anthropic API key is required")))
                 .modelName(anthropicModelName)
                 .timeout(timeout)
                 .temperature(temperature);
-        
-        if (!mcpServers.isEmpty() && !mcpServers.get().isEmpty()) {
+
+        if (hasMcpServers()) {
             builder = builder
                     .defaultRequestParameters(chatRequestParameters);
         }
 
         this.chatModel = builder.build();
     }
-    
+
     private void loadWatsonXModel() {
         Log.info("CHAPPiE is using WatsonX " + watsonxModelName + "(" + watsonxBaseUrl.orElse("") + ")");
         Log.info("CHAPPiE timeout set to " + timeout);
         Log.info("CHAPPiE temperature set to " + temperature);
-        
+
         WatsonxChatModel.Builder builder;
         if(watsonxCloudRegion.isPresent()){
             builder = WatsonxChatModel.builder()
                 .baseUrl(CloudRegion.valueOf(watsonxCloudRegion.get()));
         }else{
             builder = WatsonxChatModel.builder()
-                .baseUrl(watsonxBaseUrl.get());
+                .baseUrl(watsonxBaseUrl.orElseThrow(() -> new IllegalStateException("WatsonX base URL or cloud region is required")));
         }
-        
+
         builder.logRequests(logRequest)
                 .logResponses(logResponse)
                 .modelName(watsonxModelName)
-                .projectId(watsonxProjectId.get())
+                .projectId(watsonxProjectId.orElseThrow(() -> new IllegalStateException("WatsonX project ID is required")))
                 .timeout(timeout)
                 .temperature(temperature)
                 .responseFormat(ResponseFormat.JSON);
-        
-        if (!mcpServers.isEmpty() && !mcpServers.get().isEmpty()) {
+
+        if (hasMcpServers()) {
             builder = builder
                     .defaultRequestParameters(chatRequestParameters);
         }
@@ -297,12 +297,19 @@ public class ChappieService {
                 .temperature(temperature)
                 .responseFormat(ResponseFormat.JSON);
 
-        if (!mcpServers.isEmpty() && !mcpServers.get().isEmpty()) {
+        if (hasMcpServers()) {
             builder = builder
                     .defaultRequestParameters(chatRequestParameters);
         }
 
         this.chatModel = builder.build();
+    }
+
+    /**
+     * Checks if MCP servers are configured and the list is not empty.
+     */
+    private boolean hasMcpServers() {
+        return mcpServers.isPresent() && !mcpServers.get().isEmpty();
     }
 
     @Produces
@@ -341,13 +348,13 @@ public class ChappieService {
     }
 
     private void enableMcpIfConfigured() {
-        if (mcpServers.isEmpty() || mcpServers.get().isEmpty()) {
+        if (!hasMcpServers()) {
             Log.info("CHAPPiE MCP: no servers configured; continuing without MCP.");
             return;
         }
         List<McpTransport> transports = new java.util.ArrayList<>();
 
-        for (String raw : mcpServers.get()) {
+        for (String raw : mcpServers.orElse(List.of())) {
             String s = raw.trim();
             try {
                 if (s.startsWith("stdio:")) {
@@ -382,23 +389,41 @@ public class ChappieService {
 
         List<McpClient> clients = new java.util.ArrayList<>();
         int idx = 0;
-        for (McpTransport t : transports) {
-            McpClient client = new DefaultMcpClient.Builder()
-                    .key("chappie-mcp-" + (idx++))
-                    .clientName("CHAPPiE")
-                    .clientVersion(versionOr("dev"))
-                    .transport(t)
+        try {
+            for (McpTransport t : transports) {
+                McpClient client = new DefaultMcpClient.Builder()
+                        .key("chappie-mcp-" + (idx++))
+                        .clientName("CHAPPiE")
+                        .clientVersion(versionOr("dev"))
+                        .transport(t)
+                        .build();
+                clients.add(client);
+            }
+            mcpClients.addAll(clients);
+
+            this.mcpToolProvider = McpToolProvider.builder()
+                    .mcpClients(clients)
+                    //.resourcesAsToolsPresenter(McpResourcesAsToolsPresenter.basic())
                     .build();
-            clients.add(client);
+
+            Log.infof("CHAPPiE MCP: enabled with %d server(s).", clients.size());
+        } catch (Exception e) {
+            // Clean up any clients that were created before the failure
+            Log.errorf("CHAPPiE MCP: failed to initialize clients: %s. Cleaning up resources.", e.getMessage());
+            for (McpClient c : clients) {
+                try {
+                    c.close();
+                } catch (Exception ignored) {
+                }
+            }
+            // Close transports that weren't associated with a client yet
+            for (int i = clients.size(); i < transports.size(); i++) {
+                try {
+                    transports.get(i).close();
+                } catch (Exception ignored) {
+                }
+            }
         }
-        mcpClients.addAll(clients);
-
-        this.mcpToolProvider = McpToolProvider.builder()
-                .mcpClients(clients)
-                //.resourcesAsToolsPresenter(McpResourcesAsToolsPresenter.basic())
-                .build();
-
-        Log.infof("CHAPPiE MCP: enabled with %d server(s).", clients.size());
     }
 
 
