@@ -47,6 +47,27 @@ public class RagSqlLoader {
     private static final String AGGREGATED_GROUP_PATH = "io/quarkus";
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
 
+    static boolean supportsRagSql(String version) {
+        if (version == null || version.isBlank() || version.contains("SNAPSHOT")) {
+            return true;
+        }
+        try {
+            String[] parts = version.split("[.\\-]");
+            int major = Integer.parseInt(parts[0]);
+            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+            if (major > 3 || (major == 3 && minor > 36)) {
+                return true;
+            }
+            if (major == 3 && minor == 36) {
+                int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+                return patch >= 1;
+            }
+            return false;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     private static final String CREATE_EXTENSION_DDL = "CREATE EXTENSION IF NOT EXISTS vector";
     private static final String CREATE_TABLE_DDL = """
             CREATE TABLE IF NOT EXISTS rag_documents (
@@ -71,6 +92,11 @@ public class RagSqlLoader {
         }
         if (quarkusVersion == null) {
             Log.warn("Could not determine Quarkus version for RAG loading");
+            return;
+        }
+
+        if (!supportsRagSql(quarkusVersion)) {
+            Log.debugf("Quarkus %s predates RAG SQL support — skipping (using pre-built image)", quarkusVersion);
             return;
         }
 
