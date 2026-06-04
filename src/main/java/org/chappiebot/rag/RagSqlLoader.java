@@ -308,12 +308,16 @@ public class RagSqlLoader {
             return List.of();
         }
 
-        Path pomFile = Path.of(projectDir, "pom.xml");
-        if (!Files.isRegularFile(pomFile)) {
+        Path dir = Path.of(projectDir);
+        List<Dependency> deps;
+        if (Files.isRegularFile(dir.resolve("pom.xml"))) {
+            deps = parsePomDependencies(dir.resolve("pom.xml"));
+        } else if (Files.isRegularFile(dir.resolve("build.gradle")) || Files.isRegularFile(dir.resolve("build.gradle.kts"))) {
+            deps = resolveGradleDependencies(dir);
+        } else {
             return List.of();
         }
 
-        List<PomDependency> deps = parsePomDependencies(pomFile);
         if (deps.isEmpty()) {
             return List.of();
         }
@@ -321,7 +325,7 @@ public class RagSqlLoader {
         Path m2Repo = resolveLocalMavenRepo();
         List<RagFragment> fragments = new ArrayList<>();
 
-        for (PomDependency dep : deps) {
+        for (Dependency dep : deps) {
             if (CORE_GROUP_ID.equals(dep.groupId) || dep.version == null) {
                 continue;
             }
@@ -346,10 +350,10 @@ public class RagSqlLoader {
         return m.find() ? m.group(1) : fallback;
     }
 
-    private record PomDependency(String groupId, String artifactId, String version) {
+    private record Dependency(String groupId, String artifactId, String version) {
     }
 
-    private static List<PomDependency> parsePomDependencies(Path pomFile) {
+    private static List<Dependency> parsePomDependencies(Path pomFile) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -367,7 +371,7 @@ public class RagSqlLoader {
                 }
             }
 
-            List<PomDependency> deps = new ArrayList<>();
+            List<Dependency> deps = new ArrayList<>();
             NodeList depNodes = doc.getElementsByTagName("dependency");
             for (int i = 0; i < depNodes.getLength(); i++) {
                 Element depEl = (Element) depNodes.item(i);
@@ -391,13 +395,68 @@ public class RagSqlLoader {
                     }
                 }
 
-                deps.add(new PomDependency(groupId, artifactId, version));
+                deps.add(new Dependency(groupId, artifactId, version));
             }
             return deps;
         } catch (Exception e) {
             Log.debugf("Failed to parse pom.xml: %s", e.getMessage());
             return List.of();
         }
+    }
+
+    private static final Pattern GRADLE_DEP_LINE = Pattern.compile(
+            "^[|\\s]*[+\\\\]---\\s+(\\S+):(\\S+):(\\S+?)(?:\\s+->\\s+(\\S+))?(?:\\s+\\(.*\\))?\\s*$");
+
+    private static List<Dependency> resolveGradleDependencies(Path projectDir) {
+        String gradleCmd = Files.isRegularFile(projectDir.resolve("gradlew"))
+                ? "./gradlew" : "gradle";
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    gradleCmd, "dependencies",
+                    "--configuration", "runtimeClasspath",
+                    "-q", "--console=plain")
+                    .directory(projectDir.toFile())
+                    .redirectErrorStream(true);
+            Process process = pb.start();
+            String output;
+            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
+                output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
+            }
+            if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return List.of();
+            }
+            if (process.exitValue() != 0) {
+                return List.of();
+            }
+            return parseGradleDependencyOutput(output);
+        } catch (Exception e) {
+            Log.debugf("Failed Gradle dependency resolution: %s", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static List<Dependency> parseGradleDependencyOutput(String output) {
+        if (output == null || output.isBlank()) {
+            return List.of();
+        }
+        List<Dependency> deps = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String line : output.split("\n")) {
+            if (!line.startsWith("+---") && !line.startsWith("\\---")) {
+                continue;
+            }
+            Matcher m = GRADLE_DEP_LINE.matcher(line);
+            if (m.matches()) {
+                String groupId = m.group(1);
+                String artifactId = m.group(2);
+                String version = m.group(4) != null ? m.group(4) : m.group(3);
+                if (seen.add(groupId + ":" + artifactId)) {
+                    deps.add(new Dependency(groupId, artifactId, version));
+                }
+            }
+        }
+        return deps;
     }
 
     private static String resolveProperty(String value, Map<String, String> properties) {
