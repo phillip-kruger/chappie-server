@@ -48,6 +48,7 @@ public class RagSqlLoader {
     private static final String AGGREGATED_ARTIFACT_ID = "quarkus-documentation-core-rag";
     private static final String AGGREGATED_GROUP_PATH = "io/quarkus";
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
+    private static String cachedProjectDir;
 
     static boolean supportsRagSql(String version) {
         if (version == null || version.isBlank() || version.contains("SNAPSHOT")) {
@@ -101,6 +102,8 @@ public class RagSqlLoader {
             Log.debugf("Quarkus %s predates RAG SQL support — skipping (using pre-built image)", quarkusVersion);
             return;
         }
+
+        cachedProjectDir = projectDir;
 
         try (Connection conn = dataSource.getConnection()) {
             ensureSchema(conn);
@@ -167,7 +170,7 @@ public class RagSqlLoader {
     }
 
     private static String loadCoreSqlContent(String version) {
-        Path m2Repo = Path.of(System.getProperty("user.home"), ".m2", "repository");
+        Path m2Repo = resolveLocalMavenRepo();
         Path jarPath = m2Repo.resolve(AGGREGATED_GROUP_PATH)
                 .resolve(AGGREGATED_ARTIFACT_ID)
                 .resolve(version)
@@ -218,7 +221,8 @@ public class RagSqlLoader {
     }
 
     private static Path downloadFromMavenCentral(String version, Path targetPath) {
-        String url = MAVEN_CENTRAL_BASE + "/" + AGGREGATED_GROUP_PATH + "/" + AGGREGATED_ARTIFACT_ID
+        String baseUrl = resolveMavenRepoBaseUrl();
+        String url = baseUrl + "/" + AGGREGATED_GROUP_PATH + "/" + AGGREGATED_ARTIFACT_ID
                 + "/" + version + "/" + AGGREGATED_ARTIFACT_ID + "-" + version + ".jar";
 
         Log.infof("RAG SQL not found locally, downloading from %s...", url);
@@ -314,7 +318,7 @@ public class RagSqlLoader {
             return List.of();
         }
 
-        Path m2Repo = Path.of(System.getProperty("user.home"), ".m2", "repository");
+        Path m2Repo = resolveLocalMavenRepo();
         List<RagFragment> fragments = new ArrayList<>();
 
         for (PomDependency dep : deps) {
@@ -485,7 +489,7 @@ public class RagSqlLoader {
     }
 
     private static String detectLatestInstalledVersion() {
-        Path quarkusDir = Path.of(System.getProperty("user.home"), ".m2", "repository", "io", "quarkus", "quarkus-core");
+        Path quarkusDir = resolveLocalMavenRepo().resolve("io/quarkus/quarkus-core");
         if (!Files.isDirectory(quarkusDir)) {
             return null;
         }
@@ -502,5 +506,152 @@ public class RagSqlLoader {
         } catch (IOException e) {
             return null;
         }
+    }
+
+    // ── Maven settings resolution ───────────────────────────────────────────
+
+    private static String resolveMavenRepoBaseUrl() {
+        String url = findInSettingsFiles(RagSqlLoader::parseMirrorUrl);
+        return url != null ? url : MAVEN_CENTRAL_BASE;
+    }
+
+    private static Path resolveLocalMavenRepo() {
+        Path repo = findInSettingsFiles(RagSqlLoader::parseLocalRepository);
+        return repo != null ? repo : Path.of(System.getProperty("user.home"), ".m2", "repository");
+    }
+
+    private static <T> T findInSettingsFiles(java.util.function.Function<Path, T> extractor) {
+        if (cachedProjectDir != null) {
+            Path customSettings = parseSettingsFromMvnConfig(Path.of(cachedProjectDir));
+            if (customSettings != null && Files.isRegularFile(customSettings)) {
+                T result = extractor.apply(customSettings);
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+
+        Path userSettings = Path.of(System.getProperty("user.home"), ".m2", "settings.xml");
+        if (Files.isRegularFile(userSettings)) {
+            T result = extractor.apply(userSettings);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        String mavenHome = System.getenv("MAVEN_HOME");
+        if (mavenHome == null) {
+            mavenHome = System.getenv("M2_HOME");
+        }
+        if (mavenHome == null) {
+            mavenHome = System.getProperty("maven.home");
+        }
+        if (mavenHome != null) {
+            Path globalSettings = Path.of(mavenHome, "conf", "settings.xml");
+            if (Files.isRegularFile(globalSettings)) {
+                T result = extractor.apply(globalSettings);
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static Path parseSettingsFromMvnConfig(Path projectDir) {
+        Path configFile = projectDir.resolve(".mvn/maven.config");
+        if (!Files.isRegularFile(configFile)) {
+            return null;
+        }
+        try {
+            String content = Files.readString(configFile, StandardCharsets.UTF_8);
+            String[] tokens = content.trim().split("\\s+");
+            for (int i = 0; i < tokens.length; i++) {
+                String token = tokens[i];
+                String settingsValue = null;
+                if ((token.equals("-s") || token.equals("--settings")) && i + 1 < tokens.length) {
+                    settingsValue = tokens[i + 1];
+                } else if (token.startsWith("-s=")) {
+                    settingsValue = token.substring(3);
+                } else if (token.startsWith("--settings=")) {
+                    settingsValue = token.substring(11);
+                }
+                if (settingsValue != null) {
+                    Path settingsPath = Path.of(settingsValue);
+                    if (!settingsPath.isAbsolute()) {
+                        settingsPath = projectDir.resolve(settingsPath);
+                    }
+                    return settingsPath.normalize();
+                }
+            }
+        } catch (IOException e) {
+            Log.debugf("Failed to read .mvn/maven.config: %s", e.getMessage());
+        }
+        return null;
+    }
+
+    private static String parseMirrorUrl(Path settingsFile) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            Document doc = factory.newDocumentBuilder().parse(settingsFile.toFile());
+
+            NodeList mirrors = doc.getElementsByTagName("mirror");
+            for (int i = 0; i < mirrors.getLength(); i++) {
+                Element mirror = (Element) mirrors.item(i);
+                String mirrorOf = childText(mirror, "mirrorOf");
+                String url = childText(mirror, "url");
+
+                if (mirrorOf != null && url != null && mirrorOfMatchesCentral(mirrorOf)) {
+                    return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+                }
+            }
+        } catch (Exception e) {
+            Log.debugf("Failed to parse settings.xml at %s: %s", settingsFile, e.getMessage());
+        }
+        return null;
+    }
+
+    private static boolean mirrorOfMatchesCentral(String mirrorOf) {
+        String trimmed = mirrorOf.trim();
+        if (trimmed.equals("*") || trimmed.equals("central") || trimmed.equals("external:*")) {
+            return true;
+        }
+        if (trimmed.contains(",")) {
+            String[] parts = trimmed.split(",");
+            boolean matched = false;
+            for (String part : parts) {
+                String p = part.trim();
+                if (p.equals("!central")) {
+                    return false;
+                }
+                if (p.equals("*") || p.equals("central") || p.equals("external:*")) {
+                    matched = true;
+                }
+            }
+            return matched;
+        }
+        return false;
+    }
+
+    private static Path parseLocalRepository(Path settingsFile) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            Document doc = factory.newDocumentBuilder().parse(settingsFile.toFile());
+
+            NodeList nodes = doc.getElementsByTagName("localRepository");
+            if (nodes.getLength() > 0) {
+                String text = nodes.item(0).getTextContent();
+                if (text != null && !text.trim().isEmpty()) {
+                    String path = text.trim().replace("${user.home}", System.getProperty("user.home"));
+                    return Path.of(path);
+                }
+            }
+        } catch (Exception e) {
+            Log.debugf("Failed to parse settings.xml at %s: %s", settingsFile, e.getMessage());
+        }
+        return null;
     }
 }
