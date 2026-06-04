@@ -19,8 +19,10 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -146,8 +148,8 @@ public class RagSqlLoader {
         }
     }
 
-    private static java.util.Set<String> queryLoadedSources(DataSource dataSource) {
-        var sources = new java.util.HashSet<String>();
+    private static Set<String> queryLoadedSources(DataSource dataSource) {
+        var sources = new HashSet<String>();
         try (Connection conn = dataSource.getConnection();
                 Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(
@@ -295,6 +297,7 @@ public class RagSqlLoader {
 
     private static final Pattern SOURCE_PATTERN = Pattern.compile(
             "metadata\\s*->>\\s*'source'\\s*=\\s*'([^']+)'");
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private static List<RagFragment> discoverNonCoreFragments(String projectDir) {
         if (projectDir == null || projectDir.isBlank()) {
@@ -397,7 +400,7 @@ public class RagSqlLoader {
         if (value == null || !value.contains("${")) {
             return value;
         }
-        Matcher m = Pattern.compile("\\$\\{([^}]+)}").matcher(value);
+        Matcher m = PROPERTY_PATTERN.matcher(value);
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             String replacement = properties.getOrDefault(m.group(1), m.group(0));
