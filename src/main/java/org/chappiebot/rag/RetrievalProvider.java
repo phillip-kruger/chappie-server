@@ -117,9 +117,8 @@ public class RetrievalProvider {
         }
     }
 
-    // TODO do we need to pad the extensions with commas to avoid partial matches?
     private Filter extensionFilter(String extension) {
-        return new ContainsString("extensions_csv_padded", extension);
+        return new ContainsString("extensions", extension);
     }
 
     public List<SearchMatch> search(String queryMessage, int maxResults, String restrictToExtension) {
@@ -127,6 +126,7 @@ public class RetrievalProvider {
     }
 
     public List<SearchMatch> search(String queryMessage, int maxResults, String restrictToExtension, boolean useMetadataBoost) {
+        storeManager.refreshRagData();
         Embedding embeddedQuery = embeddingModel.embed(queryMessage).content();
 
         // Fetch more results if using metadata boost, so we can rerank

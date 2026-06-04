@@ -7,6 +7,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import java.util.Optional;
 import javax.sql.DataSource;
+import org.chappiebot.rag.RagSqlLoader;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -24,11 +25,18 @@ public class StoreManager {
     
     @ConfigProperty(name = "chappie.rag.pgvector.dimension", defaultValue = "384")
     int dim;
+
+    @ConfigProperty(name = "chappie.rag.quarkus-version")
+    Optional<String> quarkusVersion;
+
+    @ConfigProperty(name = "chappie.rag.project-dir")
+    Optional<String> projectDir;
     
     private volatile Optional<PgVectorEmbeddingStore> cached;
+    private volatile DataSource resolvedDs;
 
     private JdbcChatMemoryStore jdbcChatMemoryStore = null;
-    
+
     public Optional<PgVectorEmbeddingStore> getStore() {
         if (this.cached != null) return this.cached;
         synchronized (this) {
@@ -44,7 +52,17 @@ public class StoreManager {
             return cached;
         }
     }
-    
+
+    /**
+     * Re-checks for new RAG SQL fragments (e.g. after the user adds a Quarkiverse extension).
+     * Fast no-op when nothing new is found.
+     */
+    public void refreshRagData() {
+        if (resolvedDs != null) {
+            RagSqlLoader.ensureLoaded(resolvedDs, quarkusVersion.orElse(null), projectDir.orElse(null));
+        }
+    }
+
     public Optional<JdbcChatMemoryStore> getJdbcChatMemoryStore(){
         if(this.jdbcChatMemoryStore == null){
             synchronized (this) {
@@ -58,10 +76,12 @@ public class StoreManager {
         }
         return Optional.of(this.jdbcChatMemoryStore);
     }
-    
+
     private DataSource resolveDataSource() {
         if (chappieDs != null && chappieDs.isResolvable()) {
             DataSource ds = chappieDs.get();
+            resolvedDs = ds;
+            RagSqlLoader.ensureLoaded(ds, quarkusVersion.orElse(null), projectDir.orElse(null));
             if(ensureChatTableExists(ds, MEMORY_TABLE) && ensureNameTableExists(ds, MEMORY_NAME_TABLE)) {
                 jdbcChatMemoryStore = new JdbcChatMemoryStore(ds, MEMORY_TABLE, MEMORY_NAME_TABLE);
             }
